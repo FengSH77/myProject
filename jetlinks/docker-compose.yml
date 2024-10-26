@@ -1,0 +1,72 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend/jetlinks-standalone  # 后端 Dockerfile 所在目录
+      dockerfile: Dockerfile  # 如果 Dockerfile 名称是默认的，可以省略此行
+    ports:
+      - "8848:8848"  # 映射后端服务端口
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/jetlinks #数据库连接URL
+      SPRING_DATASOURCE_USERNAME: jetlinks  #数据库用户名
+      SPRING_DATASOURCE_PASSWORD: jetlinks #数据库密码
+      SPRING_REDIS_HOST: redis  #redis服务主机名
+
+  frontend:
+    build:
+      context: ./frontend  # 前端 Dockerfile 所在目录
+      dockerfile: Dockerfile  # 如果 Dockerfile 名称是默认的，可以省略此行
+    ports:
+      - "80:80"  # 映射前端服务端口
+  redis:
+    image: redis:5.0.4
+    container_name: jetlinks-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - "./data/redis:/data"
+    command: redis-server --appendonly yes --requirepass "JetLinks@redis"
+    environment:
+      - TZ=Asia/Shanghai
+  elasticsearch:
+    image: elasticsearch:6.8.10
+    container_name: jetlinks-elasticsearch
+    environment:
+      ES_JAVA_OPTS: "-Djava.net.preferIPv4Stack=true -Xms2g -Xmx2g"
+      TZ: Asia/Shanghai
+      transport.host: 0.0.0.0
+      discovery.type: single-node
+      bootstrap.memory_lock: "true"
+      discovery.zen.minimum_master_nodes: 1
+      discovery.zen.ping.unicast.hosts: elasticsearch
+    volumes:
+      - "./data/elasticsearch:/usr/share/elasticsearch/data"
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+  kibana:
+    image: kibana:6.8.10
+    container_name: jetlinks-kibana
+    environment:
+      ELASTICSEARCH_URL: http://elasticsearch:9200
+    links:
+      - elasticsearch:elasticsearch
+    ports:
+      - "5601:5601"
+    depends_on:
+      - elasticsearch
+  mysql:
+    image: mysql:5.7.18
+    container_name: jetlinks-mysql
+    ports:
+      - "3306:3306"
+    command: --default-authentication-plugin=mysql_native_password --skip-name-resolve
+    volumes:
+      - "./data/mysql:/var/lib/mysql"
+    environment:
+      MYSQL_ROOT_PASSWORD: jetlinks
+      MYSQL_DATABASE: jetlinks
+      MYSQL_USER: jetlinks
+      MYSQL_PASSWORD: jetlinks
+      TZ: Asia/Shanghai
